@@ -1,0 +1,5 @@
+searchengine	keyword	URL(%s=search word)
+alcŒŸõ	alc	http://eow.alc.co.jp/search?q=%s
+“ú¨‰p	jaen	https://translate.google.co.jp/?ie=UTF-8&hl=ja&client=tw-ob#ja/en/%s
+‰p¨“ú	enja	https://translate.google.co.jp/?ie=UTF-8&hl=ja&client=tw-ob#en/ja/%s
+—ŞŒêŒŸõ	ruigo	http://thesaurus.weblio.jp/content/%s

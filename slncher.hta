@@ -1,0 +1,325 @@
+﻿<html>
+<head>
+	<title>slncher</title>
+	<HTA:APPLICATION
+		APPLICATIONNAME="slncher"
+		ID="thisHTA"
+		SCROLL="no"
+		MAXIMIZEBUTTON="no"
+		MINIMIZEBUTTON="no"
+		SINGLEINSTANCE="yes"
+		SCROLLFLAT="yes"
+		SHOWINTASKBAR="no"
+	/>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+	
+	<script type="text/javascript">
+		var SRCH_FILE = 'searchengine.txt';
+		var SHORT_CUT = 'shortcut';
+		var INI_FILE  = 'position.ini';
+		var SHELL_APP = new ActiveXObject( "Shell.Application" );
+		var WSHELL = new ActiveXObject( "WScript.Shell" );
+		var FILE_OBJ = new ActiveXObject( "Scripting.FileSystemObject" );
+		var SPACE = 32;
+		var BACKSPACE = 8;
+		var ENTER = 13;
+		
+		resize();
+		window.onresize = resize;
+		checkFiles();
+		
+		var Sengines = function(sengines) {
+			this.sengines = sengines;
+		};
+		
+		Sengines.prototype.getSengineByKey = function(key) {
+			for(var i=0; i<this.sengines.length; i++) {
+				if(this.sengines[i].getKey() === key) return this.sengines[i];
+			}
+			return null;
+		}
+		
+		Sengines.prototype.getSengineBySoption = function(soption) {
+			for(var i=0; i<this.sengines.length; i++) {
+				if(this.sengines[i].getSoption() === soption) return this.sengines[i];
+			}
+			return null;
+		}
+		
+		Sengines.prototype.getSoptions = function() {
+			var soptions = [];
+			for(var i=0; i<this.sengines.length; i++) {
+				soptions.push(this.sengines[i].getSoption());
+			}
+			return soptions;
+		}
+		
+		var Sengine = function(soption, key, url) {
+			this.soption = soption;
+			this.key    = key;
+			this.url    = url;
+		}
+		
+		Sengine.prototype.getSoption = function() {
+			return this.soption;
+		}
+		
+		Sengine.prototype.getKey = function() {
+			return this.key;
+		}
+		
+		Sengine.prototype.getUrl = function() {
+			return this.url;
+		}
+		
+		var SRCHDATA = getSearchEngineData();
+		
+		function resize() {
+			var width = 300; //240
+			var height = 130; //130
+
+			window.resizeTo(width, height);    // window size
+			window.moveTo(    //  middle on window
+				(window.screen.width - width) / 2,
+				(window.screen.height - height) / 2
+			);
+		}
+		
+		function checkFiles() {
+			if(!exist(SRCH_FILE)) {
+				var FORWRITING          = 2;
+				var TRISTATE_USEDEFAULT = -2; // 文字コード system default
+				var fo = FILE_OBJ.OpenTextFile( SRCH_FILE, FORWRITING, true, TRISTATE_USEDEFAULT );
+				fo.WriteLine("#searchengine	keyword	URL(%s=search word)");
+				fo.WriteLine("alc search	alc	http://eow.alc.co.jp/search?q=%s");
+				fo.Close();
+			}
+		}
+		
+		window.onload = function() {
+			var str=''; // variable to store the options
+			var keys = getOptionKeys();
+			for(var i=0; i<keys.length; i++) {
+				if('desktop.ini' === keys[i]) continue;
+				str += '<option value="'+ keys[i] +'" />';
+			}
+			var srchwd = document.getElementById("srchwd");
+			srchwd.innerHTML = str;
+		}
+		
+		window.onfocus = function() {
+			document.getElementById("targetwd").value = '';
+			document.getElementById("targetwd").focus();
+			moveWindow(INI_FILE);
+		}
+		
+		window.onblur  = function() {
+			writeWindowPos(INI_FILE);
+			window.close();
+		}
+		
+		function moveWindow(ini) {
+			var FORREADING      = 1; // read only
+			var TRISTATE_FALSE  = 0; // ASCII
+			
+			if(FILE_OBJ.FileExists(ini)) {
+				var fo = FILE_OBJ.OpenTextFile( ini, FORREADING, true, TRISTATE_FALSE );
+				if(fo === null) return;
+				var contents = fo.ReadLine();
+				fo.Close();
+				
+				if(contents === null) return;
+				var pos = contents.split(/,/g);
+				var x = pos[0];
+				var y = pos[1];
+				if(x > -1000 && y > -1000)
+					window.moveTo(x, y);
+			}
+		}
+		
+		function writeWindowPos(ini) {
+			var FORWRITING      = 2;
+			var TRISTATE_FALSE  = 0; // ASCII
+			var fo = FILE_OBJ.OpenTextFile( ini, FORWRITING, true, TRISTATE_FALSE );
+			var winleft = window.screenLeft;
+			var wintop  = window.screenTop;
+			var x = winleft - 9;
+			var y = wintop - 36;
+			if(winleft === 0) x = 300;
+			if(wintop === 0) y = 300;
+			fo.WriteLine(x + ',' + y);
+			fo.Close();
+		}
+		
+		function displaySoption(e) {
+			if(e.keyCode === SPACE || e.keyCode === BACKSPACE) {
+				var swd = document.getElementById("targetwd").value.split(/\s+/)[0];
+				var sengine = SRCHDATA.getSengineByKey(swd);
+				if(sengine != null) {
+					var opt = sengine.getSoption();
+					display(opt);
+				} else {
+					document.getElementById("soption").innerHTML = '';
+				}
+			}
+		}
+		
+		function display(opt) {
+			if(opt != null && opt.length >= 15) opt = opt.substr(0, 14) + '...';
+			document.getElementById("soption").innerHTML = opt + ' {search word}';
+		}
+		
+		
+		function getSearchEngineData() {
+			var FORREADING          =  1; // read only
+			var TRISTATE_USEDEFAULT = -2; // 文字コード system default
+			var file = FILE_OBJ.OpenTextFile( SRCH_FILE, FORREADING, true, TRISTATE_USEDEFAULT );
+			
+			var sengines = [];
+			while( !file.AtEndOfStream ) {
+				var val = file.ReadLine().split(/\t/);
+				var expln = val[0];
+				var key = val[1];
+				var url = val[2];
+				
+				if(key != null && url != null && expln != null) {
+					if (expln.lastIndexOf('#', 0) === 0) continue;
+					var opt = key + "(" + expln + ")";
+					sengines.push(new Sengine(opt, key, url));
+				}
+			}
+			file.Close();
+			return new Sengines(sengines);
+		}
+		
+		var delay = (function () {
+			var timer = 0;
+			return function (callback, ms) {
+				clearTimeout(timer);
+				timer = setTimeout(callback, ms);
+			};
+		})();
+		
+		function runScript(e) {
+			if(e.keyCode === ENTER) {
+				delay(open, 100);
+			}
+			return false;
+		}
+		
+		function open() {
+			var targetwd = document.getElementById("targetwd").value.trim();
+			var fv = getFiles()[targetwd];
+			if(fv != null) {
+				SHELL_APP.Open(fv);
+				return;
+			}
+			
+			var sengine = SRCHDATA.getSengineBySoption(targetwd);
+			if(sengine != null) {
+				display(targetwd);
+				document.getElementById("targetwd").value = sengine.getKey() + ' ';
+				return;
+			}
+			
+			var key = targetwd.split(/\s+/)[0];
+			var sengine2 = SRCHDATA.getSengineByKey(key);
+			var searchwd = targetwd.replace(new RegExp(escapeRegExp(key), 'gi'), '').trim();
+			if(sengine2 == null || searchwd == null) {
+				WSHELL.Run('http://www.google.com/search?q=' + encodeURIComponent(targetwd));
+				return;
+			}
+			
+			var sopt = sengine2.getUrl();
+			var target = sopt.replace(/%s/g, encodeURIComponent(searchwd));
+			if (target.lastIndexOf('http', 0) === 0) {
+				WSHELL.Run(target);
+				return;
+			}
+			
+			if(exist(target)) {
+				SHELL_APP.Open(target);
+			} else {
+				alert("URL doesn't exist.");
+			}
+		}
+		
+		function escapeRegExp(str) {
+			return str.replace(new RegExp("[\\|\*|\+|\.|\?|\[|\]|\{|\}|\(|\)|\^|\$|\-|\||\/]", 'gi'), "\$1");
+		}
+		
+		function exist(t) {
+			return FILE_OBJ.FileExists(t) || FILE_OBJ.FolderExists(t);
+		}
+		
+		function getOptionKeys() {
+			var r = Object.keys(getFiles()).concat(SRCHDATA.getSoptions());
+			var keys = r.sort(function(a,b) {
+				var al = a.toLowerCase();
+				var bl = b.toLowerCase();
+				if(al < bl) return -1;
+				if(al > bl) return 1;
+				return 0;
+			});
+			return keys;
+		}
+		
+		function getFiles() {
+			return mergehash(getShortcuts(), getFavorites());
+		}
+		
+		function getShortcuts() {
+			return enumFiles(SHORT_CUT);
+		}
+		
+		function getFavorites() {
+			var wshenv = WSHELL.Environment( "PROCESS" );
+			var usrname = wshenv( "USERNAME" );
+
+			var favflr = "C:\\Users\\" + usrname + "\\Favorites";
+			return enumFiles(favflr);
+		}
+		
+		function enumFiles(target) {
+			if (FILE_OBJ.FileExists(target)) {
+				return [target];
+			}
+			if (!FILE_OBJ.FolderExists(target)) return [];
+
+			var result = [];
+			var dir = FILE_OBJ.GetFolder(target); // get files
+			var e = new Enumerator(dir.Files);
+			for ( ; !e.atEnd(); e.moveNext()) {
+				var file = e.item();
+				result[file.Name] = file.Path;
+			}
+			
+			e = new Enumerator(dir.SubFolders); // get subfolders files
+			for ( ; !e.atEnd(); e.moveNext()) {
+				var r = enumFiles(e.item());
+				result = mergehash(result, r);
+			}
+			
+			return result;
+		}
+		
+		function mergehash(obj1,obj2){
+			var obj3 = {};
+			for (var attrname in obj1) { obj3[attrname] = obj1[attrname]; }
+			for (var attrname in obj2) { obj3[attrname] = obj2[attrname]; }
+			return obj3;
+		}
+		
+		function chgEng(tbox) {
+			tbox.style.imeMode="inactive";
+		}
+	</script>
+</head>
+<body>
+	<input id="targetwd" name="srchwd" list="srchwd" autocomplete="on" onkeydown="runScript(event)" onkeyup="displaySoption(event)" style="width:240px;" onfocus="chgEng(this)">
+	<datalist id="srchwd">
+	</datalist>
+	<small id="soption" style="width:240px;"></small>
+</body>
+</html>
